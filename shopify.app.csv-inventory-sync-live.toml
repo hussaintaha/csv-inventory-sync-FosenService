@@ -1,0 +1,23 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "4a31b33d8e53186b8624fa9d8a4c6f10"
+application_url = "https://example.com/"
+embedded = true
+name = "CSV Inventory Sync"
+handle = "csv-inventory-sync-1"
+
+[build]
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2025-04"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_inventory,write_inventory,write_products"
+
+[auth]
+redirect_urls = [ "https://example.com/api/auth" ]
+
+[pos]
+embedded = false
