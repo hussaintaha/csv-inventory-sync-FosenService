@@ -1,14 +1,53 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Page,
   Layout,
   Card,
   Button,
   Text,
+  InlineStack,
+  TextField,
+  FormLayout,
 } from "@shopify/polaris";
 
 export default function Index() {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [category, setCategory] = useState('');
+
+  const handleImportProduct = useCallback(async () => {
+    setLoading(true);
+    try {
+      if (category.trim() === '') {
+        shopify.toast.show({
+          message: 'Please select a category to import products.',
+          duration: 5000,
+          isError: true,
+        });
+        return;
+      }
+      const response = await fetch(`/api/importProducts?category=${category}`);
+      if (!response.ok) throw new Error('Sync failed');
+      const data = await response.json();
+      // console.log("Data received:", data);
+    } catch (error) {
+      console.error("Error syncing products:", error);
+    }
+  }, [category]);
+
+  useEffect(() => {
+    const fetchImportStatus = async () => {
+      try {
+        const response = await fetch('/api/getSyncStatus');
+        if (!response.ok) throw new Error('Failed to fetch syncStatus data');
+        const data = await response.json();
+        console.log("Initial data fetched:", data);
+        setLoading(data?.[0]?.isProductImportProcessing || false);
+      } catch (error) {
+        console.error("Error fetching syncStatus data:", error);
+      }
+    };
+    fetchImportStatus();
+  }, []);
 
   const handleSyncProduct = useCallback(async () => {
     setLoading(true);
@@ -19,37 +58,57 @@ export default function Index() {
       console.log("Data received:", data);
     } catch (error) {
       console.error("Error syncing products:", error);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
   return (
-    <Page>
+    <Page >
       <Layout>
         <Layout.Section>
-          <div style={{ maxWidth: '600px', margin: '120px auto', textAlign: 'center' }}>
-            <Card sectioned>
-              <Text variant="headingXl" as="h4">
-                🚀 Welcome to the Inventory Sync App
+          <div style={{ maxWidth: '800px', margin: '30px auto', padding: '24px', textAlign: 'center' }}>
+            <div style={{ padding: '24px' }}>
+              <Text variant="heading2xl" as="h1">
+                🚀 Sync Your Inventory Effortlessly
               </Text>
-              <div style={{ margin: '8px' }}></div>
-              <Text variant="headingSm" as="h6">
-                Your product inventory syncs automatically from your SFTP folder. Keep your products inventory always up-to-date—no manual work needed!
+              <Text variant="bodyLg" as="p" tone="subdued" style={{ marginTop: '16px' }}>
+                Your product inventory syncs automatically from your SFTP folder. Keep your products inventory always up-to-date no manual work needed!
               </Text>
-              <div style={{ margin: '8px' }}></div>
-              {/* <Button
-                primary
-                onClick={handleSyncProduct}
-                loading={loading}
-                disabled={loading}
-              >
-                {loading ? 'Syncing Products...' : 'Manually Sync Now'}
-              </Button> */}
-            </Card>
+              {/* <div style={{ marginTop: '24px' }}>
+                <Button primary onClick={handleSyncProduct} loading={loading} disabled={loading}>
+                  {loading ? 'Syncing Products...' : 'Sync Products Now'}
+                </Button>
+              </div> */}
+            </div>
           </div>
         </Layout.Section>
+
+        <Layout.AnnotatedSection
+          id="storeDetails"
+          title="📦 Import Products by Category"
+          description="Import products as per the category from your SFTP CSV file. Make sure the category matches the one in the CSV file; otherwise, the import feature will not work as expected."
+        >
+          <Card padding="600">
+            <FormLayout>
+              <TextField
+                label="Enter a category to import products"
+                placeholder="e.g., Sommerdekk"
+                type="text"
+                value={category}
+                onChange={(value) => setCategory(value)}
+                autoComplete="off"
+              />
+              <Button
+                variant='primary'
+                onClick={handleImportProduct}
+                disabled={loading || !category}
+              >
+                {loading ? 'Importing…' : 'Import Products'}
+              </Button>
+            </FormLayout>
+          </Card>
+        </Layout.AnnotatedSection>
       </Layout>
     </Page>
+
   );
 }

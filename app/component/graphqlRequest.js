@@ -1,7 +1,8 @@
 const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 70 * 1000;
+// const RETRY_DELAY_MS = 70 * 1000;
+const RETRY_DELAY_MS = 1000;
 
-export const graphqlRequest = async (shopData, query, variables, api_version = "2024-07") => {
+export const graphqlRequest = async (shopData, query, variables, api_version = "2025-04") => {
     // console.log("dsfsdfdfsddffd------------------sdfdfsdfsd", shopData, "     ", query, "       ", api_version);
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         // console.log("shopData[0]?.shop----------------->", shopData[0]?.shop);
