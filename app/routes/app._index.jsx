@@ -5,14 +5,31 @@ import {
   Card,
   Button,
   Text,
-  InlineStack,
-  TextField,
   FormLayout,
+  Select,
 } from "@shopify/polaris";
 
 export default function Index() {
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('');
+
+  const categoryOptions = [
+    { label: 'Sommerdekk', value: 'Sommerdekk' },
+    { label: 'Slanger', value: 'Slanger' },
+    { label: 'Tilhenger og AW -dekk', value: 'Tilhenger og AW -dekk' },
+    { label: 'Truckdekk', value: 'Truckdekk' },
+    { label: 'M+S', value: 'M+S' },
+    { label: 'Lastebil- og bussdekk', value: 'Lastebil- og bussdekk' },
+    { label: 'Anleggsdekk', value: 'Anleggsdekk' },
+    { label: 'M+S Pigg', value: 'M+S Pigg' },
+    { label: 'Industridekk', value: 'Industridekk' },
+    { label: 'Plen- og hagedekk', value: 'Plen- og hagedekk' },
+    { label: 'Traktordekk', value: 'Traktordekk' },
+    { label: 'High Speed Tilhengerdekk', value: 'High Speed Tilhengerdekk' },
+    { label: 'MC dekk', value: 'MC dekk' },
+    { label: 'ATV-dekk', value: 'ATV-dekk' },
+    { label: 'Smådekk', value: 'Smådekk' },
+  ]
 
   const handleImportProduct = useCallback(async () => {
     setLoading(true);
@@ -25,7 +42,7 @@ export default function Index() {
         });
         return;
       }
-      const response = await fetch(`/api/importProducts?category=${category}`);
+      const response = await fetch(`/api/importProducts?category=${encodeURIComponent(category)}`); // encodeURIComponent added because + character in URLs is automatically decoded as a space by default when using URLSearchParams on server-side, so I encode it to ensure it is treated correctly.
       if (!response.ok) throw new Error('Sync failed');
       const data = await response.json();
       // console.log("Data received:", data);
@@ -85,17 +102,24 @@ export default function Index() {
         <Layout.AnnotatedSection
           id="storeDetails"
           title="📦 Import Products by Category"
-          description="Import products as per the category from your SFTP CSV file. Make sure the category matches the one in the CSV file; otherwise, the import feature will not work as expected."
+          description="Import/Add products in shopify as per the selected category of your SFTP server CSV file."
         >
           <Card padding="600">
             <FormLayout>
-              <TextField
+              {/* <TextField
                 label="Enter a category to import products"
                 placeholder="e.g., Sommerdekk"
                 type="text"
                 value={category}
                 onChange={(value) => setCategory(value)}
                 autoComplete="off"
+              /> */}
+              <Select
+                label="Select a category to import products"
+                placeholder="e.g., Sommerdekk"
+                options={categoryOptions}
+                onChange={(v) => setCategory(v)}
+                value={category}
               />
               <Button
                 variant='primary'

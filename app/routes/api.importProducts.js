@@ -2,9 +2,9 @@ import csvParser from "csv-parser";
 import { Readable } from "stream";
 import Client from "ssh2-sftp-client";
 import prisma from "../db.server";
-import fs from "fs";
-import path from "path";
-import { finished } from "stream/promises";
+// import fs from "fs";
+// import path from "path";
+// import { finished } from "stream/promises";
 import { graphqlRequest } from "../component/graphqlRequest";
 
 const {
@@ -17,9 +17,9 @@ const {
 
 const sftp = new Client();
 
-function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// function sleep(ms) {
+//     return new Promise((resolve) => setTimeout(resolve, ms));
+// }
 
 async function parseCsvFromSftp({ category }) {
     if (!SFTP_HOST || !SFTP_PORT || !SFTP_USER || !SFTP_PASSWORD || !SFTP_REMOTE_IMPORT_PRODUCT_FILE_PATH) {
@@ -29,6 +29,7 @@ async function parseCsvFromSftp({ category }) {
         throw new Error("Category is required.");
     }
     console.log("Connecting to SFTP server...");
+    console.log("category:", category);
     try {
         await sftp.connect({
             host: SFTP_HOST,
@@ -214,7 +215,7 @@ export const loader = async ({ request, params }) => {
         let collectionId = null;
         const getCollectionQuery = `
             query CustomCollectionList {
-                collections(first: 50, query: "title:${parseResults[0].Category}") {
+                collections(first: 50, query: "title:'${parseResults[0].Category}'") {
                     nodes {
                         id
                         handle
@@ -225,7 +226,7 @@ export const loader = async ({ request, params }) => {
         `;
 
         const collectionFromShopify = await graphqlRequest(shopData, getCollectionQuery);
-        console.log("collectionFromShopify:", collectionFromShopify);
+        // console.log("collectionFromShopify:", collectionFromShopify);
         if (!collectionFromShopify || !collectionFromShopify.data || !collectionFromShopify.data.collections || !collectionFromShopify.data.collections.nodes) {
             const secondStatus = await prisma.SyncStatus.findFirst();
             await prisma.SyncStatus.update({
@@ -305,13 +306,16 @@ export const loader = async ({ request, params }) => {
 
         for (const item of parseResults) {
             try {
-                console.log(
-                    `SKU: "${item.SKU}", Category: "${item.Category}", Price: "${item.Price}", Image: "${item.Image}", Description: "${item.Description}", ProductTitle: "${item.ProductTitle}"`
-                );
+                // console.log(
+                //     `SKU: "${item.SKU}", Category: "${item.Category}", Price: "${item.Price}", Image: "${item.Image}", Description: "${item.Description}", ProductTitle: "${item.ProductTitle}"`
+                // );
 
+                if (!item.SKU) {
+                    console.error("SKU is missing for item:", item);
+                    continue; // skipping this item because SKU is missing
+                }
 
-                if (item.Price) {
-                    const existingProductQuery = `
+                const existingProductQuery = `
                         query {
                             products(first: 10, query: "sku:${item.SKU}") {
                                 nodes {
@@ -321,17 +325,22 @@ export const loader = async ({ request, params }) => {
                             }
                         }
                     `;
-                    const existingProductResult = await graphqlRequest(shopData, existingProductQuery);
-                    // console.log("existingProductResult:", existingProductResult);
-                    if (existingProductResult && existingProductResult?.data && existingProductResult?.data?.products && existingProductResult?.data?.products?.nodes && existingProductResult?.data?.products?.nodes?.length > 0) {
-                        console.log(`Product with SKU ${item.SKU} already exists.`);
-                        continue; // skipping the existing item.
-                    }
-
-                    const productCreationMutation = `
+                const existingProductResult = await graphqlRequest(shopData, existingProductQuery);
+                // console.log("existingProductResult:", existingProductResult);
+                if (existingProductResult && existingProductResult?.data && existingProductResult?.data?.products && existingProductResult?.data?.products?.nodes && existingProductResult?.data?.products?.nodes?.length > 0) {
+                    // console.log(`Product with SKU ${item.SKU} already exists.`);
+                    continue; // skipping the existing item.
+                }
+                const productFields = [];
+                productFields.push(`collectionsToJoin: ["${collectionId}"]`)
+                if (item.ProductTitle) productFields.push(`title: "${item.ProductTitle || item.SKU}"`);
+                if (item.Description) productFields.push(`descriptionHtml: "${item.Description}"`);
+                const productInput = `{ ${productFields.join(', ')} }`;
+                // console.log("productInput:", productInput);
+                const productCreationMutation = `
                         mutation {
                             productCreate(
-                                product: {title: "${item.ProductTitle}", collectionsToJoin: ["${collectionId}"], descriptionHtml: "${item.Description}"}
+                                product: ${productInput}
                             ) {
                                 userErrors {
                                     field
@@ -351,42 +360,42 @@ export const loader = async ({ request, params }) => {
                             }
                         }
                     `
-                    const productCreationResult = await graphqlRequest(shopData, productCreationMutation)
-                    // console.log("productCreationResult:", productCreationResult);
-                    if (!productCreationResult || !productCreationResult.data || !productCreationResult.data.productCreate || productCreationResult.data.productCreate.userErrors.length > 0) {
-                        console.error("Failed to create product:", productCreationResult.data.productCreate.userErrors);
-                        continue; // skipping this item because product creation failed
-                    }
-                    const productId = productCreationResult.data.productCreate.product.id;
-                    const vatiantId = productCreationResult.data.productCreate.product.variants.nodes[0].id;
-                    console.log("Created product with ID:", productId);
-                    console.log("Created variant with ID:", vatiantId);
-                    if (!productId || !vatiantId) {
-                        console.error("Product ID or Variant ID not found after creation.");
-                        continue; // skipping this item because product ID is missing
-                    }
-                    // const variantUpdateMutation = `
-                    // mutation ProductVariantsUpdate($productId: ID!) {
-                    //     productVariantsBulkUpdate(
-                    //         productId: $productId
-                    //         media: [{originalSource: "${item.Image}", mediaContentType: IMAGE}]
-                    //         variants: [{id: "${vatiantId}", price: ${parseFloat(item.Price)}, inventoryItem: {sku: "${item.SKU}"}}]
-                    //     ) {
-                    //             product {
-                    //                 id
-                    //             }
-                    //             productVariants {
-                    //                 id
-                    //             }
-                    //             userErrors {
-                    //                 field
-                    //                 message
-                    //             }
-                    //         }
-                    //     }
-                    // `
+                const productCreationResult = await graphqlRequest(shopData, productCreationMutation)
+                // console.log("productCreationResult:", productCreationResult);
+                if (!productCreationResult || !productCreationResult.data || !productCreationResult.data.productCreate || productCreationResult.data.productCreate.userErrors.length > 0) {
+                    console.error("Failed to create product:", productCreationResult.data.productCreate.userErrors);
+                    continue; // skipping this item because product creation failed
+                }
+                const productId = productCreationResult.data.productCreate.product.id;
+                const variantId = productCreationResult.data.productCreate.product.variants.nodes[0].id;
+                // console.log("Created product with ID:", productId);
+                // console.log("Created variant with ID:", variantId);
+                if (!productId || !variantId) {
+                    console.error("Product ID or Variant ID not found after creation.");
+                    continue; // skipping this item because product ID is missing
+                }
+                // const variantUpdateMutation = `
+                // mutation ProductVariantsUpdate($productId: ID!) {
+                //     productVariantsBulkUpdate(
+                //         productId: $productId
+                //         media: [{originalSource: "${item.Image}", mediaContentType: IMAGE}]
+                //         variants: [{id: "${variantId}", price: ${parseFloat(item.Price)}, inventoryItem: {sku: "${item.SKU}"}}]
+                //     ) {
+                //             product {
+                //                 id
+                //             }
+                //             productVariants {
+                //                 id
+                //             }
+                //             userErrors {
+                //                 field
+                //                 message
+                //             }
+                //         }
+                //     }
+                // `
 
-                    const variantUpdateMutation = `
+                const variantUpdateMutation = `
                     mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!, $media: [CreateMediaInput!]) {
                         productVariantsBulkUpdate(productId: $productId, variants: $variants, media: $media) {
                             product {
@@ -402,27 +411,23 @@ export const loader = async ({ request, params }) => {
                         }
                     }
                     `
-                    const variantUpdateResult = await graphqlRequest(shopData, variantUpdateMutation, {
-                        variables: {
-                            productId: productId,
-                            ...(item.Image ? { media: [{ originalSource: item.Image.replace(/ /g, "%20"), mediaContentType: "IMAGE" }] } : {}),
-                            variants: [{
-                                id: vatiantId,
-                                price: parseFloat(item.Price),
-                                inventoryItem: { sku: item.SKU, tracked: true },
-                            }]
-                        }
-                    });
-                    // console.log("variantUpdateResult:", variantUpdateResult);
-                    if (!variantUpdateResult || !variantUpdateResult.data || !variantUpdateResult.data.productVariantsBulkUpdate || variantUpdateResult.data.productVariantsBulkUpdate.userErrors.length > 0) {
-                        console.error("Failed to update product variants:", variantUpdateResult.data.productVariantsBulkUpdate.userErrors);
-                        continue; // skipping this item because variant update failed
+                const variantUpdateResult = await graphqlRequest(shopData, variantUpdateMutation, {
+                    variables: {
+                        productId: productId,
+                        ...(item.Image ? { media: [{ originalSource: item.Image.replace(/ /g, "%20"), mediaContentType: "IMAGE" }] } : {}),
+                        variants: [{
+                            id: variantId,
+                            ...(item.Price ? { price: parseFloat(item.Price) } : {}),
+                            inventoryItem: { sku: item.SKU, tracked: true },
+                        }]
                     }
-                    console.log("Product variants updated successfully for SKU:", item.SKU);
-                } else {
-                    console.log(`Skipping product creation for SKU: ${item.SKU} due to missing price.`);
-                    continue; // skipping this item because price is missing
+                });
+                // console.log("variantUpdateResult:", variantUpdateResult);
+                if (!variantUpdateResult || !variantUpdateResult.data || !variantUpdateResult.data.productVariantsBulkUpdate || variantUpdateResult.data.productVariantsBulkUpdate.userErrors.length > 0) {
+                    console.error("Failed to update product variants:", variantUpdateResult.data.productVariantsBulkUpdate.userErrors);
+                    continue; // skipping this item because variant update failed
                 }
+                console.log("Product imported successfully for SKU:", item.SKU);
 
             } catch (error) {
                 console.error("Error processing item:", item, error);
@@ -430,7 +435,7 @@ export const loader = async ({ request, params }) => {
             }
         }
 
-        console.log("==============All products processed successfully==============");
+        console.log("================All products processed successfully================");
 
         const secondStatus = await prisma.SyncStatus.findFirst();
         await prisma.SyncStatus.update({

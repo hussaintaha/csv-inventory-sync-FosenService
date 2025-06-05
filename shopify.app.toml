@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "3df7a5410f238931f46b8399250fc87e"
-application_url = "https://cook-schedule-levitra-glucose.trycloudflare.com"
+application_url = "https://begin-elements-theft-ti.trycloudflare.com"
 embedded = true
 name = "CSV Sync Inventory (Fosen)"
 handle = "csv-sync-inventory-fosen"
@@ -20,9 +20,9 @@ scopes = "read_inventory,write_inventory,write_products"
 
 [auth]
 redirect_urls = [
-  "https://cook-schedule-levitra-glucose.trycloudflare.com/auth/callback",
-  "https://cook-schedule-levitra-glucose.trycloudflare.com/auth/shopify/callback",
-  "https://cook-schedule-levitra-glucose.trycloudflare.com/api/auth/callback"
+  "https://begin-elements-theft-ti.trycloudflare.com/auth/callback",
+  "https://begin-elements-theft-ti.trycloudflare.com/auth/shopify/callback",
+  "https://begin-elements-theft-ti.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
